@@ -1,4 +1,5 @@
 package com.example.collegeschedule.data.dto
+
 data class LessonDto(
     val lessonNumber: Int,
     val time: String,
@@ -8,5 +9,5 @@ data class LessonDto(
     val classroom: String,
     val building: String,
     val address: String,
-    val groupParts: Map<LessonGroupPart, LessonPartDto?>
+    val groupParts: Map<String, LessonPartDto?>
 )

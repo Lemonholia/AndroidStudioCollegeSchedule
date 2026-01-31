@@ -1,4 +1,5 @@
 package com.example.collegeschedule.ui.schedule
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth

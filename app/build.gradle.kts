@@ -48,9 +48,12 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
 
+    // Сетевое взаимодействие (Retrofit)
     implementation("com.squareup.retrofit2:retrofit:2.12.0")
     implementation("com.squareup.retrofit2:converter-gson:2.12.0")
+    // Управление состоянием UI (ViewModel для Compose) – опционально, если ктото захочет лезть в MVVM
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    // Асинхронные операции (Корутины)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     testImplementation(libs.junit)
