@@ -7,7 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 object ApiProvider {
 
     private const val EMULATOR_URL = "http://10.0.2.2:5085/"
-    private const val LOCAL_NETWORK_URL = "http://192.168.0.25:5085/"
+    private const val LOCAL_NETWORK_URL = "http://192.168.0.12:5085/"
 
     private fun createRetrofit(baseUrl: String): ScheduleApi {
         return Retrofit.Builder()
