@@ -61,6 +61,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.0")
 // Если используете навигацию
     implementation("androidx.navigation:navigation-compose:2.6.0")
+    implementation("androidx.compose.foundation:foundation:1.6.0-beta02")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

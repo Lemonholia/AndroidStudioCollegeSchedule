@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,7 +25,12 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScheduleScreen(repository: ScheduleRepository) {
+fun ScheduleScreen(
+    repository: ScheduleRepository,
+    isFavorite: (String) -> Boolean,
+    toggleFavorite: (String) -> Unit,
+    onNavigateToFavorites: () -> Unit
+) {
     var groups by remember { mutableStateOf<List<String>>(emptyList()) }
     var selectedGroup by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(false) }
@@ -54,7 +60,19 @@ fun ScheduleScreen(repository: ScheduleRepository) {
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.primary
-                )
+                ),
+                actions = {
+                    // Кнопка перехода в избранное
+                    IconButton(
+                        onClick = onNavigateToFavorites
+                    ) {
+                        Icon(
+                            Icons.Filled.Favorite,
+                            contentDescription = "Избранное",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -66,10 +84,8 @@ fun ScheduleScreen(repository: ScheduleRepository) {
                             error = null
                             scope.launch {
                                 try {
-                                    // Используем пустые строки для дат, если API их принимает
                                     schedule = repository.loadSchedule(selectedGroup!!, "", "")
                                 } catch (e: Exception) {
-                                    // Если не работает с пустыми строками, попробуем с текущей датой
                                     try {
                                         val today = LocalDate.now()
                                         val startDate = today.toString()
@@ -124,11 +140,52 @@ fun ScheduleScreen(repository: ScheduleRepository) {
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
-                    Text(
-                        text = "Выберите группу",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Выберите группу",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // Кнопка добавления в избранное (если группа выбрана)
+                        if (selectedGroup != null) {
+                            IconButton(
+                                onClick = {
+                                    toggleFavorite(selectedGroup!!)
+                                    scope.launch {
+                                        if (isFavorite(selectedGroup!!)) {
+                                            snackbarHostState.showSnackbar("Группа добавлена в избранное")
+                                        } else {
+                                            snackbarHostState.showSnackbar("Группа удалена из избранного")
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isFavorite(selectedGroup!!)) {
+                                        Icons.Filled.Favorite
+                                    } else {
+                                        Icons.Outlined.FavoriteBorder
+                                    },
+                                    contentDescription = if (isFavorite(selectedGroup!!)) {
+                                        "Удалить из избранного"
+                                    } else {
+                                        "Добавить в избранное"
+                                    },
+                                    tint = if (isFavorite(selectedGroup!!)) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -158,7 +215,22 @@ fun ScheduleScreen(repository: ScheduleRepository) {
                         ) {
                             groups.forEach { group ->
                                 DropdownMenuItem(
-                                    text = { Text(group) },
+                                    text = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(group)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            if (isFavorite(group)) {
+                                                Icon(
+                                                    Icons.Filled.Favorite,
+                                                    contentDescription = "В избранном",
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
+                                            }
+                                        }
+                                    },
                                     onClick = {
                                         selectedGroup = group
                                         expanded = false
@@ -311,19 +383,8 @@ fun ScheduleDayCard(
     schedule: ScheduleByDateDto,
     modifier: Modifier = Modifier
 ) {
-    // Валидация данных перед отображением
-    val date = try {
-        // Пробуем разные варианты названия поля для даты
-        val dateValue = when {
-            schedule.lessonDate != null -> schedule.lessonDate
-            else -> null
-        }
-        dateValue?.toString() ?: "Дата не указана"
-    } catch (e: Exception) {
-        "Дата не указана"
-    }
-
-    val safeLessons = schedule.lessons ?: emptyList()
+    val date = schedule.lessonDate ?: "Дата не указана"
+    val lessons = schedule.lessons ?: emptyList()
 
     Card(
         modifier = modifier,
@@ -337,13 +398,11 @@ fun ScheduleDayCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Заголовок дня
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Форматируем дату для лучшего отображения
                 val formattedDate = try {
                     if (date != "Дата не указана") {
                         val localDate = LocalDate.parse(date)
@@ -362,14 +421,14 @@ fun ScheduleDayCard(
                 )
 
                 SmallChip(
-                    label = { Text("${safeLessons.size} пар") },
+                    label = { Text("${lessons.size} пар") },
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (safeLessons.isEmpty()) {
+            if (lessons.isEmpty()) {
                 Text(
                     text = "Нет занятий",
                     style = MaterialTheme.typography.bodyMedium,
@@ -378,12 +437,8 @@ fun ScheduleDayCard(
                     textAlign = TextAlign.Center
                 )
             } else {
-                // Список занятий
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    safeLessons.forEachIndexed { index, lesson ->
-                        // Пропускаем null уроки
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    lessons.forEachIndexed { index, lesson ->
                         if (lesson != null) {
                             LessonItem(
                                 lesson = lesson,
@@ -425,19 +480,13 @@ fun LessonItem(
     index: Int,
     modifier: Modifier = Modifier
 ) {
-    // Валидация данных урока перед отображением
     val safeLessonNumber = lesson.lessonNumber ?: index
     val safeTime = lesson.time ?: "Время не указано"
-
-    // ОСНОВНОЕ ИСПРАВЛЕНИЕ: получаем название предмета из различных источников
     val safeSubject = getDisplaySubject(lesson)
-
-    // Получаем преподавателя и аудиторию с учетом подгрупп
     val safeTeacher = getDisplayTeacher(lesson)
     val safeTeacherPosition = getDisplayTeacherPosition(lesson)
     val safeClassroom = getDisplayClassroom(lesson)
     val safeBuilding = getDisplayBuilding(lesson)
-    val safeAddress = lesson.address ?: ""
 
     Card(
         modifier = modifier,
@@ -452,7 +501,6 @@ fun LessonItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Номер пары и время
             Column(
                 modifier = Modifier.width(80.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -473,7 +521,6 @@ fun LessonItem(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Информация о паре - теперь предмет всегда отображается
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -533,14 +580,11 @@ fun LessonItem(
     }
 }
 
-// Функция для получения отображаемого названия предмета
 private fun getDisplaySubject(lesson: LessonDto): String {
-    // Если есть основной предмет, используем его
     if (!lesson.subject.isNullOrEmpty()) {
         return lesson.subject
     }
 
-    // Ищем предметы в groupParts
     val subjects = mutableSetOf<String>()
 
     lesson.groupParts.forEach { (_, part) ->
@@ -554,24 +598,19 @@ private fun getDisplaySubject(lesson: LessonDto): String {
             if (subjects.size == 1) {
                 subjects.first()
             } else {
-                // Если несколько разных предметов для разных подгрупп
                 subjects.joinToString(" / ")
             }
         }
-        // Fallback варианты
         !lesson.teacher.isNullOrEmpty() -> "Занятие с ${lesson.teacher}"
         else -> "Занятие"
     }
 }
 
-// Функция для получения отображаемого преподавателя
 private fun getDisplayTeacher(lesson: LessonDto): String {
-    // Если есть основной преподаватель, используем его
     if (!lesson.teacher.isNullOrEmpty()) {
         return lesson.teacher
     }
 
-    // Ищем преподавателей в groupParts
     val teachers = mutableSetOf<String>()
 
     lesson.groupParts.forEach { (_, part) ->
@@ -592,14 +631,11 @@ private fun getDisplayTeacher(lesson: LessonDto): String {
     }
 }
 
-// Функция для получения должности преподавателя
 private fun getDisplayTeacherPosition(lesson: LessonDto): String {
-    // Если есть основная должность, используем ее
     if (!lesson.teacherPosition.isNullOrEmpty()) {
         return lesson.teacherPosition
     }
 
-    // Ищем должности в groupParts
     val positions = mutableSetOf<String>()
 
     lesson.groupParts.forEach { (_, part) ->
@@ -620,14 +656,11 @@ private fun getDisplayTeacherPosition(lesson: LessonDto): String {
     }
 }
 
-// Функция для получения отображаемой аудитории
 private fun getDisplayClassroom(lesson: LessonDto): String {
-    // Если есть основная аудитория, используем ее
     if (!lesson.classroom.isNullOrEmpty()) {
         return lesson.classroom
     }
 
-    // Ищем аудитории в groupParts
     val classrooms = mutableSetOf<String>()
 
     lesson.groupParts.forEach { (_, part) ->
@@ -648,14 +681,11 @@ private fun getDisplayClassroom(lesson: LessonDto): String {
     }
 }
 
-// Функция для получения отображаемого корпуса
 private fun getDisplayBuilding(lesson: LessonDto): String {
-    // Если есть основной корпус, используем его
     if (!lesson.building.isNullOrEmpty()) {
         return lesson.building
     }
 
-    // Ищем корпуса в groupParts
     val buildings = mutableSetOf<String>()
 
     lesson.groupParts.forEach { (_, part) ->
